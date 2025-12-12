@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply transition-colors duration-250;
+  }
+  
+  body {
+    @apply font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .glass {
+    backdrop-filter: blur(10px);
+    background: rgba(15, 23, 36, 0.8);
+  }
+  
+  .card-hover {
+    @apply transition-all duration-250 hover:shadow-lg hover:-translate-y-1;
+  }
+}
