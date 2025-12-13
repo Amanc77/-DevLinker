@@ -1,77 +1,89 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
 import CommunityCard from '../components/CommunityCard';
+import { communitiesAPI, usersAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const Discover = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { isAuthenticated } = useAuth();
+  const [communities, setCommunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [joinedCommunities, setJoinedCommunities] = useState([]);
+  const [savedCommunities, setSavedCommunities] = useState([]);
   const [filters, setFilters] = useState({
-    stack: '',
-    level: '',
-    mode: '',
-    language: '',
+    tech_stack: searchParams.get('tech_stack') || '',
+    platform: searchParams.get('platform') || '',
+    location_mode: searchParams.get('location_mode') || '',
+    activity_level: searchParams.get('activity_level') || '',
+    search: searchParams.get('search') || '',
   });
 
-  const communities = [
-    {
-      id: 1,
-      name: 'React Developers',
-      description: 'A vibrant community of React developers sharing knowledge, best practices, and helping each other grow.',
-      members: '12.5k',
-      tags: ['React', 'JavaScript', 'Frontend'],
-      matchScore: 95,
-    },
-    {
-      id: 2,
-      name: 'Node.js Enthusiasts',
-      description: 'Connect with Node.js developers worldwide. Share projects, get help, and learn together.',
-      members: '8.3k',
-      tags: ['Node.js', 'Backend', 'JavaScript'],
-      matchScore: 88,
-    },
-    {
-      id: 3,
-      name: 'Python Learners',
-      description: 'Perfect for beginners and experts alike. Learn Python, share code, and build amazing projects.',
-      members: '15.2k',
-      tags: ['Python', 'Programming', 'Learning'],
-      matchScore: 92,
-    },
-    {
-      id: 4,
-      name: 'Vue.js Community',
-      description: 'The progressive JavaScript framework. Join us to discuss Vue, Nuxt, and modern frontend development.',
-      members: '6.7k',
-      tags: ['Vue', 'JavaScript', 'Frontend'],
-      matchScore: 85,
-    },
-    {
-      id: 5,
-      name: 'Machine Learning Hub',
-      description: 'Explore AI and ML with fellow enthusiasts. Share research, projects, and learn from experts.',
-      members: '9.1k',
-      tags: ['ML', 'AI', 'Data Science'],
-      matchScore: 90,
-    },
-    {
-      id: 6,
-      name: 'Full Stack Developers',
-      description: 'For developers who love both frontend and backend. Share full-stack projects and experiences.',
-      members: '11.3k',
-      tags: ['Full Stack', 'Web Development'],
-      matchScore: 87,
-    },
-  ];
+  useEffect(() => {
+    fetchCommunities();
+    if (isAuthenticated) {
+      fetchUserCommunities();
+    }
+  }, [filters, isAuthenticated]);
+
+  const fetchCommunities = async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (filters.tech_stack) params.tech_stack = filters.tech_stack;
+      if (filters.platform) params.platform = filters.platform;
+      if (filters.location_mode) params.location_mode = filters.location_mode;
+      if (filters.activity_level) params.activity_level = filters.activity_level;
+      if (filters.search) params.search = filters.search;
+
+      const response = await communitiesAPI.getAll(params);
+      setCommunities(response.data || []);
+    } catch (error) {
+      console.error('Error fetching communities:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUserCommunities = async () => {
+    try {
+      const response = await usersAPI.getMyCommunities();
+      setJoinedCommunities(response.data.joined || []);
+      setSavedCommunities(response.data.saved || []);
+    } catch (error) {
+      console.error('Error fetching user communities:', error);
+    }
+  };
 
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    setSearchParams(newFilters);
+  };
+
+  const handleSearch = (query) => {
+    const newFilters = { ...filters, search: query };
+    setFilters(newFilters);
+    setSearchParams(newFilters);
   };
 
   const clearFilters = () => {
-    setFilters({
-      stack: '',
-      level: '',
-      mode: '',
-      language: '',
-    });
+    const emptyFilters = {
+      tech_stack: '',
+      platform: '',
+      location_mode: '',
+      activity_level: '',
+      search: '',
+    };
+    setFilters(emptyFilters);
+    setSearchParams({});
+  };
+
+  const handleUpdate = () => {
+    if (isAuthenticated) {
+      fetchUserCommunities();
+    }
   };
 
   return (
@@ -81,19 +93,19 @@ const Discover = () => {
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
             Discover Communities
           </h1>
-          <p className="text-muted-dark dark:text-muted-dark">
+          <p className="text-gray-600 dark:text-muted-dark">
             Find the perfect community for your tech stack and interests
           </p>
         </div>
 
         <div className="mb-8">
-          <SearchBar onSearch={(query) => console.log('Search:', query)} />
+          <SearchBar onSearch={handleSearch} placeholder={filters.search || "Search tech stack, location, or interests..."} />
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Filter Panel */}
           <aside className="lg:w-64 flex-shrink-0">
-            <div className="bg-dark-card dark:bg-dark-card border border-dark-border rounded-xl p-6 sticky top-24">
+            <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-xl p-6 sticky top-24">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Filters</h2>
                 <button
@@ -107,72 +119,79 @@ const Discover = () => {
               <div className="space-y-6">
                 {/* Tech Stack */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Tech Stack
                   </label>
                   <select
-                    value={filters.stack}
-                    onChange={(e) => handleFilterChange('stack', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-dark-bg border border-dark-border rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={filters.tech_stack}
+                    onChange={(e) => handleFilterChange('tech_stack', e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-dark-bg border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">All Stacks</option>
-                    <option value="react">React</option>
-                    <option value="node">Node.js</option>
-                    <option value="python">Python</option>
-                    <option value="vue">Vue.js</option>
-                    <option value="angular">Angular</option>
+                    <option value="Web (React/JS)">Web (React/JS)</option>
+                    <option value="Backend (Node)">Backend (Node)</option>
+                    <option value="Backend (Python)">Backend (Python)</option>
+                    <option value="ML/AI">ML/AI</option>
+                    <option value="General">General</option>
+                    <option value="Mobile (iOS)">Mobile (iOS)</option>
+                    <option value="Mobile (Android)">Mobile (Android)</option>
+                    <option value="Game Dev">Game Dev</option>
                   </select>
                 </div>
 
-                {/* Learning Level */}
+                {/* Platform */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                    Learning Level
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Platform
                   </label>
                   <select
-                    value={filters.level}
-                    onChange={(e) => handleFilterChange('level', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-dark-bg border border-dark-border rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={filters.platform}
+                    onChange={(e) => handleFilterChange('platform', e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-dark-bg border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="">All Levels</option>
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
+                    <option value="">All Platforms</option>
+                    <option value="Discord">Discord</option>
+                    <option value="Slack">Slack</option>
+                    <option value="Reddit">Reddit</option>
+                    <option value="Forum">Forum</option>
+                    <option value="Telegram">Telegram</option>
+                    <option value="GitHub">GitHub</option>
                   </select>
                 </div>
 
-                {/* Mode */}
+                {/* Location Mode */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                    Mode
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Location Mode
                   </label>
                   <select
-                    value={filters.mode}
-                    onChange={(e) => handleFilterChange('mode', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-dark-bg border border-dark-border rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={filters.location_mode}
+                    onChange={(e) => handleFilterChange('location_mode', e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-dark-bg border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">All Modes</option>
-                    <option value="online">Online</option>
-                    <option value="local">Local</option>
-                    <option value="hybrid">Hybrid</option>
+                    <option value="Global/Online">Global/Online</option>
+                    <option value="Regional (US)">Regional (US)</option>
+                    <option value="Regional (Africa)">Regional (Africa)</option>
+                    <option value="Local">Local</option>
                   </select>
                 </div>
 
-                {/* Language */}
+                {/* Activity Level */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                    Language
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Activity Level
                   </label>
                   <select
-                    value={filters.language}
-                    onChange={(e) => handleFilterChange('language', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-dark-bg border border-dark-border rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={filters.activity_level}
+                    onChange={(e) => handleFilterChange('activity_level', e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-dark-bg border border-gray-300 dark:border-dark-border rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="">All Languages</option>
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
-                    <option value="de">German</option>
+                    <option value="">All Levels</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Very Active">Very Active</option>
                   </select>
                 </div>
               </div>
@@ -182,16 +201,32 @@ const Discover = () => {
           {/* Community Grid */}
           <main className="flex-1">
             <div className="mb-6 flex items-center justify-between">
-              <p className="text-sm text-muted-dark dark:text-muted-dark">
-                {communities.length} communities found
+              <p className="text-sm text-gray-600 dark:text-muted-dark">
+                {loading ? 'Loading...' : `${communities.length} communities found`}
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {communities.map((community) => (
-                <CommunityCard key={community.id} community={community} />
-              ))}
-            </div>
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : communities.length === 0 ? (
+              <div className="text-center py-12 bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-xl">
+                <p className="text-gray-600 dark:text-muted-dark">No communities found. Try adjusting your filters.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {communities.map((community) => (
+                  <CommunityCard
+                    key={community._id || community.id}
+                    community={community}
+                    joinedCommunities={joinedCommunities}
+                    savedCommunities={savedCommunities}
+                    onUpdate={handleUpdate}
+                  />
+                ))}
+              </div>
+            )}
           </main>
         </div>
       </div>
@@ -200,4 +235,3 @@ const Discover = () => {
 };
 
 export default Discover;
-
