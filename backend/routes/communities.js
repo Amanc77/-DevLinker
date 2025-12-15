@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
       location_mode,
       activity_level,
       page = 1,
-      limit = 20
+      limit = 15
     } = req.query;
 
     // Build filter object
@@ -32,9 +32,39 @@ router.get('/', async (req, res) => {
     }
 
     if (tech_stack) {
-      // Escape special regex characters and make case-insensitive search
-      const escapedTechStack = tech_stack.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.tech_stack = { $regex: escapedTechStack, $options: 'i' };
+      // Decode URL-encoded values and trim
+      const decodedTechStack = decodeURIComponent(tech_stack).trim();
+      
+      // Map common variations to actual database values
+      const techStackMap = {
+        'backend (node)': 'Node.js',
+        'backend node': 'Node.js',
+        'node': 'Node.js',
+        'nodejs': 'Node.js',
+        'react': 'React',
+        'python': 'Python',
+        'machine learning': 'Machine Learning',
+        'ml/ai': 'Machine Learning',
+        'ml': 'Machine Learning',
+        'ai': 'Machine Learning',
+        'vue': 'Vue',
+        'angular': 'Angular',
+        'django': 'Django',
+        'flask': 'Flask',
+      };
+      
+      // Check if we have a mapped value
+      const normalized = decodedTechStack.toLowerCase();
+      const mappedValue = techStackMap[normalized];
+      
+      if (mappedValue) {
+        // Use exact match for mapped values
+        filter.tech_stack = mappedValue;
+      } else {
+        // Use case-insensitive regex for other values
+        const escapedTechStack = decodedTechStack.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        filter.tech_stack = { $regex: escapedTechStack, $options: 'i' };
+      }
     }
 
     if (platform) {
@@ -58,12 +88,18 @@ router.get('/', async (req, res) => {
 
     const total = await Community.countDocuments(filter);
 
+    const totalPages = Math.ceil(total / parseInt(limit));
+    const currentPage = parseInt(page);
+    const hasMore = currentPage < totalPages;
+
     res.json({
       success: true,
       count: communities.length,
       total,
-      page: parseInt(page),
-      pages: Math.ceil(total / parseInt(limit)),
+      page: currentPage,
+      limit: parseInt(limit),
+      totalPages,
+      hasMore,
       data: communities
     });
   } catch (error) {
